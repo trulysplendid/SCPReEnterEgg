@@ -1,4 +1,4 @@
-# SCP: ReEnter — Pterodactyl Egg
+# SCP: ReEnter - Pterodactyl Egg
 
 Official Pterodactyl egg for hosting **SCP: ReEnter Dedicated Servers**.
 
