@@ -1,0 +1,174 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-08-17T23:03:46+02:00",
+    "name": "SCP: ReEnter",
+    "author": "contact@scpreenter.com",
+    "description": "Official Pterodactyl egg for the SCP: ReEnter Dedicated Server. Installs and updates Steam AppID 4211100 via SteamCMD, supports automatic updates, server configuration, and the optional SCP WebPanel.",
+    "features": [
+        "steam_disk_space"
+    ],
+    "docker_images": {
+        "ghcr.io/ptero-eggs/steamcmd:ubuntu_24.04": "ghcr.io/ptero-eggs/steamcmd:ubuntu_24.04"
+    },
+    "file_denylist": [],
+    "startup": "if [ \"$GAME_AUTO_UPDATE\" = \"1\" ]; then STEAM_ARGS=(); if [ -n \"$SRCDS_BETAID\" ]; then STEAM_ARGS+=(-beta \"$SRCDS_BETAID\"); fi; if [ -n \"$SRCDS_BETAPASS\" ]; then STEAM_ARGS+=(-betapassword \"$SRCDS_BETAPASS\"); fi; if [ \"$VALIDATE\" = \"1\" ]; then STEAM_ARGS+=(validate); fi; ./steamcmd/steamcmd.sh +@ShutdownOnFailedCommand 1 +@NoPromptForPassword 1 +force_install_dir /home/container +login anonymous +app_update \"$SRCDS_APPID\" \"${STEAM_ARGS[@]}\" +quit || exit 1; fi; mkdir -p .steam/sdk64; if [ -f linux64/steamclient.so ]; then cp -f linux64/steamclient.so .steam/sdk64/steamclient.so; elif [ -f steamcmd/linux64/steamclient.so ]; then cp -f steamcmd/linux64/steamclient.so .steam/sdk64/steamclient.so; fi; chmod +x ./SCPReEnterServer.sh ./SCPWebPanel 2>/dev/null || true; if [ \"$ENABLE_WEB_PANEL\" = \"1\" ]; then if [ ! -x ./SCPWebPanel ]; then echo \"SCPWebPanel executable is missing. Reinstall the server or disable ENABLE_WEB_PANEL.\"; exit 1; fi; printf '{\"mode\": %s, \"port\": %s}\\n' \"$WEB_PANEL_MODE\" \"$WEB_PANEL_PORT\" > webpanel_mode.json; ./SCPWebPanel -dir /home/container/SCPReEnter/ServerConfig & fi; exec ./SCPReEnterServer.sh -log -Unattended -port={{SERVER_PORT}} -webport={{SERVER_PORT}} {{EXTRA_ARGS}}",
+    "config": {
+        "files": "{\r\n    \"SCPReEnter/ServerConfig/Global/GlobalServerConfig.ini\": {\r\n        \"parser\": \"file\",\r\n        \"find\": {\r\n            \"ServerName=\": \"ServerName={{server.build.env.SERVER_NAME}}\",\r\n            \"ServerDescription=\": \"ServerDescription={{server.build.env.SERVER_DESCRIPTION}}\",\r\n            \"MaxPlayers=\": \"MaxPlayers={{server.build.env.MAX_PLAYERS}}\",\r\n            \"bFriendlyFire=\": \"bFriendlyFire={{server.build.env.FRIENDLY_FIRE}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \"[SERVER] SCP ReEnter Dedicated Server Started\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\r\nset -euo pipefail\r\n\r\nSERVER_DIR=/mnt/server\r\nAPP_ID=${SRCDS_APPID:-4211100}\r\n\r\necho \"Installing SCP: ReEnter Dedicated Server (AppID ${APP_ID})...\"\r\nmkdir -p \"${SERVER_DIR}/steamcmd\" \"${SERVER_DIR}/steamapps\"\r\ncd /tmp\r\ncurl -fsSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\r\ntar -xzf steamcmd.tar.gz -C \"${SERVER_DIR}/steamcmd\"\r\n\r\n# SteamCMD requires a writable HOME and can fail in the installer when /mnt is not owned by root.\r\nchown -R root:root /mnt\r\nexport HOME=\"${SERVER_DIR}\"\r\ncd \"${SERVER_DIR}/steamcmd\"\r\n\r\nSTEAM_ARGS=()\r\nif [[ -n \"${SRCDS_BETAID:-}\" ]]; then\r\n    STEAM_ARGS+=(-beta \"${SRCDS_BETAID}\")\r\nfi\r\nif [[ -n \"${SRCDS_BETAPASS:-}\" ]]; then\r\n    STEAM_ARGS+=(-betapassword \"${SRCDS_BETAPASS}\")\r\nfi\r\n\r\n./steamcmd.sh +@ShutdownOnFailedCommand 1 +@NoPromptForPassword 1 +force_install_dir \"${SERVER_DIR}\" +login anonymous +app_update \"${APP_ID}\" \"${STEAM_ARGS[@]}\" validate +quit\r\n\r\n# Steamworks SDK library expected by the dedicated server.\r\nmkdir -p \"${SERVER_DIR}/.steam/sdk32\" \"${SERVER_DIR}/.steam/sdk64\"\r\ncp -f \"${SERVER_DIR}/steamcmd/linux32/steamclient.so\" \"${SERVER_DIR}/.steam/sdk32/steamclient.so\"\r\nif [[ -f \"${SERVER_DIR}/linux64/steamclient.so\" ]]; then\r\n    cp -f \"${SERVER_DIR}/linux64/steamclient.so\" \"${SERVER_DIR}/.steam/sdk64/steamclient.so\"\r\nelse\r\n    cp -f \"${SERVER_DIR}/steamcmd/linux64/steamclient.so\" \"${SERVER_DIR}/.steam/sdk64/steamclient.so\"\r\nfi\r\n\r\nif [[ ! -f \"${SERVER_DIR}/SCPReEnterServer.sh\" ]]; then\r\n    echo \"ERROR: SteamCMD completed, but SCPReEnterServer.sh was not installed.\"\r\n    exit 1\r\nfi\r\n\r\nchmod +x \"${SERVER_DIR}/SCPReEnterServer.sh\"\r\nif [[ -f \"${SERVER_DIR}/SCPWebPanel\" ]]; then\r\n    chmod +x \"${SERVER_DIR}/SCPWebPanel\"\r\nfi\r\nmkdir -p \"${SERVER_DIR}/SCPReEnter/ServerConfig/Global\"\r\n\r\necho \"SCP: ReEnter Dedicated Server installed successfully.\"",
+            "container": "ghcr.io/ptero-eggs/installers:debian",
+            "entrypoint": "/bin/bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Automatic game updates",
+            "description": "Checks for and installs a Steam update before every server start. 1 = enabled, 0 = disabled.",
+            "env_variable": "GAME_AUTO_UPDATE",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Validate server files",
+            "description": "Runs SteamCMD validation during an automatic update. Enable only for troubleshooting because startup will take longer.",
+            "env_variable": "VALIDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Server name",
+            "description": "Name displayed in the SCP: ReEnter server browser. Line breaks are not allowed.",
+            "env_variable": "SERVER_NAME",
+            "default_value": "SCP: ReEnter | Pterodactyl",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:100|not_regex:/[\\r\\n]/",
+            "field_type": "text"
+        },
+        {
+            "name": "Server description",
+            "description": "Short description or MOTD displayed to players.",
+            "env_variable": "SERVER_DESCRIPTION",
+            "default_value": "Community SCP: ReEnter server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255|not_regex:/[\\r\\n]/",
+            "field_type": "text"
+        },
+        {
+            "name": "Maximum players",
+            "description": "Maximum number of players allowed on the server.",
+            "env_variable": "MAX_PLAYERS",
+            "default_value": "20",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Friendly fire",
+            "description": "Enables or disables friendly-fire damage. Accepted values: True or False.",
+            "env_variable": "FRIENDLY_FIRE",
+            "default_value": "True",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:True,False",
+            "field_type": "text"
+        },
+        {
+            "name": "Enable SCP WebPanel",
+            "description": "Starts the optional SCPWebPanel together with the game server. Add WEB_PANEL_PORT as an additional Pterodactyl allocation first. 1 = enabled, 0 = disabled.",
+            "env_variable": "ENABLE_WEB_PANEL",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "WebPanel mode",
+            "description": "1 = automatic HTTPS with a self-signed certificate, 2 = custom HTTPS using cert.pem and key.pem, 3 = plain HTTP for a reverse proxy.",
+            "env_variable": "WEB_PANEL_MODE",
+            "default_value": "3",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|in:1,2,3",
+            "field_type": "text"
+        },
+        {
+            "name": "WebPanel port",
+            "description": "TCP port for the optional browser WebPanel. It must be assigned to the server as an additional Pterodactyl allocation.",
+            "env_variable": "WEB_PANEL_PORT",
+            "default_value": "8080",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1024|max:65535",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam branch",
+            "description": "Optional Steam branch name. Leave empty for the public stable branch.",
+            "env_variable": "SRCDS_BETAID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:64|regex:/^[A-Za-z0-9._-]*$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam branch password",
+            "description": "Password for a protected Steam branch. Leave empty for the stable branch.",
+            "env_variable": "SRCDS_BETAPASS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:128|regex:/^[A-Za-z0-9._-]*$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Additional startup arguments",
+            "description": "Optional raw arguments appended to SCPReEnterServer.sh. Leave empty unless the game documentation asks for an additional flag.",
+            "env_variable": "EXTRA_ARGS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:512|not_regex:/[\\r\\n]/",
+            "field_type": "text"
+        },
+        {
+            "name": "Runtime image automatic update switch",
+            "description": "Internal compatibility variable. The egg performs its own update so the image updater must remain disabled.",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "0",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer|in:0",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam App ID",
+            "description": "SCP: ReEnter Dedicated Server Steam AppID. Do not change.",
+            "env_variable": "SRCDS_APPID",
+            "default_value": "4211100",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|integer|in:4211100",
+            "field_type": "text"
+        }
+    ]
+}
